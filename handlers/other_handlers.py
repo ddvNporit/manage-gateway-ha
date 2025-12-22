@@ -12,4 +12,4 @@ async def process_start_comand(message: Message):
 
 @router.message(Text(text='Hi, Bot'))
 async def hi(message: Message, bot: Bot):
-    await bot.send_message(message.from_user.id, "hi, user")
+    await bot.send_message(message.from_user.id, f"hi, {message.from_user.full_name}")
