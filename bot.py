@@ -25,21 +25,3 @@ async def main() -> None:
 
 if __name__ == '__main__':
     asyncio.run(main())
-
-# Включаем логирование, чтобы не пропустить важные сообщения
-# logging.basicConfig(level=logging.INFO)
-# # Создаём объекты бота и диспетчера
-# bot = Bot(token=BOT_TOKEN)
-# dp = Dispatcher()
-#
-#
-# # Обработчик команды /start
-# @dp.message(CommandStart())
-# async def command_start_handler(message: types.Message) -> None:
-#     await message.answer(f"Привет, {message.from_user.full_name}!")
-#
-#
-# # Обработчик текстовых сообщений (эхо)
-# @dp.message()
-# async def echo_handler(message: types.Message):
-#     await message.answer(message.text)
