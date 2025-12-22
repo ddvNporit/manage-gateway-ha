@@ -25,7 +25,6 @@ async def main() -> None:
     except asyncio.CancelledError:
         logger.info("Polling was cancelled")
     finally:
-        # Корректное закрытие бота для освобождения ресурсов
         await bot.session.close()
 
 if __name__ == '__main__':
