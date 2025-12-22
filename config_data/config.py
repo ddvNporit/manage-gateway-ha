@@ -9,15 +9,24 @@ class TgBot:
 
 
 @dataclass
+class HA:
+    token: str
+    url: str
+
+
+@dataclass
 class Config:
     tg_bot: TgBot
+    ha: HA
 
 
 def load_config(path: str | None = None) -> Config:
     env: Env = Env()
     env.read_env(path)
     return Config(
-        tg_bot=TgBot(
-            token=env('BOT_TOKEN')
+        tg_bot=TgBot(token=env('BOT_TOKEN')),
+        ha=HA(
+            token=env('HA_TOKEN'),
+            url=env('HA_URL')
         )
     )
