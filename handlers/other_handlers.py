@@ -46,14 +46,13 @@ async def get_states_ha(message: Message, bot: Bot):
     if not await check_access(message):
         return
 
-    text = message.text.strip()
-    parts = text.split(maxsplit=2)
-    filter_value = parts[2] if len(parts) > 2 else None
+    filter_value, value = await processing_filter(message)
 
     req_ha = RequestApi()
     code, response = req_ha.method_get("states", None)
     if int(code) != 200:
-        await bot.send_message(message.from_user.id, f"код ответа: {code}, проверьте работоспособность HA")
+        await bot.send_message(message.from_user.id,
+                               f"код ответа: {code}, проверьте работоспособность HA, и корректность запроса")
         return
 
     reply = response.json()
@@ -88,3 +87,48 @@ async def get_states_ha(message: Message, bot: Bot):
     for msg in messages:
         await bot.send_message(message.from_user.id, msg)
         await asyncio.sleep(0.3)
+
+
+async def processing_filter(message, count_separators=2):
+    text = message.text.strip()
+    parts = text.split(maxsplit=4)
+    field = None
+    value = None
+    field = parts[2] if (len(parts) > 2 and count_separators == 2) else None
+    if count_separators == 3:
+        field = parts[2]
+        value = parts[3]
+    return field, value
+
+
+async def get_entity_id_and_attribute(data):
+    entity_id = data.get('entity_id')
+    attributes = data.get('attributes')
+    return entity_id, attributes
+
+
+@router.message(lambda message: message.text.lower().startswith("updated states"))
+async def updated_states_ha(message: Message, bot: Bot):
+    if not await check_access(message):
+        return
+    field, value = await processing_filter(message, 3)
+    req_ha = RequestApi()
+    code, response = req_ha.method_get(f"states/{field}", None)
+    if int(code) == 200:
+        entity_id, attributes = await get_entity_id_and_attribute(response.json())
+    else:
+        await bot.send_message(message.from_user.id,
+                               f"код ответа: {code}, проверьте работоспособность HA, и корректность запроса")
+        return
+    payload = {
+        "state": value,
+        "attributes": attributes
+    }
+    code, response = req_ha.method_post(f"states/{field}", payload)
+    if int(code) == 200:
+        await bot.send_message(message.from_user.id, response.text)
+    else:
+        await bot.send_message(message.from_user.id,
+                               f"код ответа: {code}, проверьте работоспособность HA, и корректность запроса")
+        return
+
