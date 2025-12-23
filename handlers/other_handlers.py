@@ -3,6 +3,7 @@ from aiogram.types import Message
 from aiogram.filters import CommandStart, Text
 from request_comand import RequestApi
 from config_data.config import Config, load_config
+import asyncio
 
 router: Router = Router()
 config: Config = load_config()
@@ -38,3 +39,40 @@ async def get_config_ha(message: Message, bot: Bot):
     req_ha = RequestApi()
     code, response = req_ha.method_get("config", None)
     await bot.send_message(message.from_user.id, f"ответ: {response.text}")
+
+
+@router.message(lambda message: message.text.lower().startswith("states ha"))
+async def get_states_ha(message: Message, bot: Bot):
+    if not await check_access(message):
+        return
+
+    parts = message.text.split()
+    count = None
+    if len(parts) > 2:  # если есть текст после "states HA"
+        try:
+            count = int(parts[2])
+            if count <= 0:
+                await bot.send_message(message.from_user.id, "Количество элементов должно быть положительным числом.")
+                return
+        except ValueError:
+            await bot.send_message(message.from_user.id, "После 'states HA' ожидается число.")
+            return
+
+    req_ha = RequestApi()
+    code, response = req_ha.method_get("states", None)
+    if int(code) == 200:
+        reply = response.json()
+
+        elements = reply if count is None else reply[:count]
+
+        text = response.text if count is None else "\n".join(
+            f"element #{i}: {elements[i]}" for i in range(len(elements)))
+
+        if len(text) <= 4096:
+            await bot.send_message(message.from_user.id, f"ответ: {text}")
+        else:
+            for i, item in enumerate(elements):
+                await bot.send_message(message.from_user.id, f"element #{i}: {item}")
+                await asyncio.sleep(1)
+    else:
+        await bot.send_message(message.from_user.id, f"код ответа: {code}, проверьте работоспособность HA")
