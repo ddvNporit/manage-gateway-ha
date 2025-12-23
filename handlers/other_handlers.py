@@ -56,7 +56,7 @@ async def get_states_ha(message: Message, bot: Bot):
         return
 
     reply = response.json()
-    filtered_elements = []
+    # filtered_elements = []
     if filter_value is None:
         filtered_elements = reply
     else:
@@ -92,12 +92,18 @@ async def get_states_ha(message: Message, bot: Bot):
 async def processing_filter(message, count_separators=2):
     text = message.text.strip()
     parts = text.split(maxsplit=4)
-    field = None
+    # field = None
     value = None
     field = parts[2] if (len(parts) > 2 and count_separators == 2) else None
     if count_separators == 3:
-        field = parts[2]
-        value = parts[3]
+        try:
+            field = parts[2]
+        except:
+            field = None
+        try:
+            value = parts[3]
+        except:
+            value = None
     return field, value
 
 
@@ -107,11 +113,19 @@ async def get_entity_id_and_attribute(data):
     return entity_id, attributes
 
 
-@router.message(lambda message: message.text.lower().startswith("updated states"))
+@router.message(lambda message: message.text.lower().startswith("update:bool states"))
 async def updated_states_ha(message: Message, bot: Bot):
     if not await check_access(message):
         return
     field, value = await processing_filter(message, 3)
+    if value in ('1', 'on', 'вкл'):
+        value = 'on'
+    elif value in ('0', 'off', 'выкл'):
+        value = 'off'
+    else:
+        await bot.send_message(message.from_user.id,
+                               f"неизвестный аргумент: {value}, допустимо: [0, 1, вкл, выкл, on, off]")
+        return
     req_ha = RequestApi()
     code, response = req_ha.method_get(f"states/{field}", None)
     if int(code) == 200:
@@ -131,4 +145,3 @@ async def updated_states_ha(message: Message, bot: Bot):
         await bot.send_message(message.from_user.id,
                                f"код ответа: {code}, проверьте работоспособность HA, и корректность запроса")
         return
-
