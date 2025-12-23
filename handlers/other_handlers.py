@@ -46,33 +46,45 @@ async def get_states_ha(message: Message, bot: Bot):
     if not await check_access(message):
         return
 
-    parts = message.text.split()
-    count = None
-    if len(parts) > 2:  # если есть текст после "states HA"
-        try:
-            count = int(parts[2])
-            if count <= 0:
-                await bot.send_message(message.from_user.id, "Количество элементов должно быть положительным числом.")
-                return
-        except ValueError:
-            await bot.send_message(message.from_user.id, "После 'states HA' ожидается число.")
-            return
+    text = message.text.strip()
+    parts = text.split(maxsplit=2)
+    filter_value = parts[2] if len(parts) > 2 else None
 
     req_ha = RequestApi()
     code, response = req_ha.method_get("states", None)
-    if int(code) == 200:
-        reply = response.json()
-
-        elements = reply if count is None else reply[:count]
-
-        text = response.text if count is None else "\n".join(
-            f"element #{i}: {elements[i]}" for i in range(len(elements)))
-
-        if len(text) <= 4096:
-            await bot.send_message(message.from_user.id, f"ответ: {text}")
-        else:
-            for i, item in enumerate(elements):
-                await bot.send_message(message.from_user.id, f"element #{i}: {item}")
-                await asyncio.sleep(1)
-    else:
+    if int(code) != 200:
         await bot.send_message(message.from_user.id, f"код ответа: {code}, проверьте работоспособность HA")
+        return
+
+    reply = response.json()
+    filtered_elements = []
+    if filter_value is None:
+        filtered_elements = reply
+    else:
+        try:
+            count = int(filter_value)
+            if count <= 0:
+                await bot.send_message(message.from_user.id, "Количество элементов должно быть положительным числом.")
+                return
+            filtered_elements = reply[:count]
+        except ValueError:
+            filtered_elements = [el for el in reply if filter_value in el.get('entity_id', '')]
+    if not filtered_elements:
+        await bot.send_message(message.from_user.id, "По заданному критерию ничего не найдено.")
+        return
+
+    messages = []
+    current_msg = ""
+    for i, el in enumerate(filtered_elements):
+        line = f"element #{i}: {el}\n"
+        if len(current_msg) + len(line) > 4096:
+            messages.append(current_msg)
+            current_msg = line
+        else:
+            current_msg += line
+    if current_msg:
+        messages.append(current_msg)
+
+    for msg in messages:
+        await bot.send_message(message.from_user.id, msg)
+        await asyncio.sleep(0.3)
