@@ -1,9 +1,11 @@
-from aiogram import Router, Bot
-from aiogram.types import Message
-from aiogram.filters import CommandStart, Text
-from request_comand import RequestApi
-from config_data.config import Config, load_config
 import asyncio
+
+from aiogram import Router, Bot
+from aiogram.filters import CommandStart, Text
+from aiogram.types import Message
+
+from config_data.config import Config, load_config
+from request_comand import RequestApi
 
 router: Router = Router()
 config: Config = load_config()
@@ -92,18 +94,10 @@ async def get_states_ha(message: Message, bot: Bot):
 async def processing_filter(message, count_separators=2):
     text = message.text.strip()
     parts = text.split(maxsplit=4)
-    # field = None
-    value = None
-    field = parts[2] if (len(parts) > 2 and count_separators == 2) else None
-    if count_separators == 3:
-        try:
-            field = parts[2]
-        except:
-            field = None
-        try:
-            value = parts[3]
-        except:
-            value = None
+
+    field = parts[2] if len(parts) > 2 and count_separators >= 2 else None
+    value = parts[3] if len(parts) > 3 and count_separators == 3 else None
+
     return field, value
 
 
