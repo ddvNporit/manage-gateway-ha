@@ -145,3 +145,30 @@ async def updated_states_ha(message: Message, bot: Bot):
         await bot.send_message(message.from_user.id,
                                f"код ответа: {code}, проверьте работоспособность HA, и корректность запроса")
         return
+
+
+@router.message(lambda message: message.text.lower().startswith("turn ha"))
+async def turn_ha_object(message: Message, bot: Bot):
+    if not await check_access(message):
+        return
+    field, value = await processing_filter(message, 3)
+    if value in ('1', 'on', 'вкл'):
+        value = 'on'
+    elif value in ('0', 'off', 'выкл'):
+        value = 'off'
+    else:
+        await bot.send_message(message.from_user.id,
+                               f"неизвестный аргумент: {value}, допустимо: [0, 1, вкл, выкл, on, off]")
+        return
+    req_ha = RequestApi()
+    payload = {
+        "entity_id": field
+    }
+    parts = field.split('.')
+    code, response = req_ha.method_post(f"services/{parts[0]}/turn_{value}", payload)
+    if int(code) == 200:
+        await bot.send_message(message.from_user.id, f"Объект {field} переведен в режим {value}")
+    else:
+        await bot.send_message(message.from_user.id,
+                               f"код ответа: {code}, проверьте работоспособность HA, и корректность запроса")
+        return

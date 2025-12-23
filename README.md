@@ -46,7 +46,16 @@ HA_URL=<URL_ДЛЯ_ДОСТУПА_К_HA>
 
   Обновить статус элемента с указанным `entity_id`.  
   Значение `<X>`:  
+  - для статуса выключен — любое из `[0, off, выкл]`,  
+  - для статуса включен — любое из `[1, on, вкл]`.  
+  Пример:  
+  `update:bool states input_boolean.test_switch выкл` — присвоить статус off для  объекта с `entity_id` = `input_boolean.test_switch`.
+
+- `turn HA <entity_id> <X>`  
+
+  Включить объект с указанным `entity_id`.  
+  Значение `<X>`:  
   - для выключения — любое из `[0, off, выкл]`,  
   - для включения — любое из `[1, on, вкл]`.  
   Пример:  
-  `update:bool states input_boolean.test_switch выкл` — выключить устройство с `entity_id` = `input_boolean.test_switch`.
+  `turn HA input_boolean.test_switch 1` — включить устройство с `entity_id` = `input_boolean.test_switch`.
