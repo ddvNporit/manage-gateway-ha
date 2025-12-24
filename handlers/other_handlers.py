@@ -5,11 +5,14 @@ from aiogram.filters import CommandStart, Text
 from aiogram.types import Message
 
 from config_data.config import Config, load_config
+from handlers.commands import CommandsOnHa as Com_Ha
+from handlers.data_processor import FiltersData as Fp
 from request_comand import RequestApi
 
 router: Router = Router()
 config: Config = load_config()
 bot_allow_users = config.tg_bot.bot_allow_users
+aliases = config.aliases.aliases
 
 
 async def check_access(message: Message) -> bool:
@@ -21,15 +24,11 @@ async def check_access(message: Message) -> bool:
 
 @router.message(CommandStart())
 async def process_start_comand(message: Message):
-    if not await check_access(message):
-        return
     await message.answer("Hi")
 
 
 @router.message(Text(text='Hi, Bot'))
 async def hi(message: Message, bot: Bot):
-    if not await check_access(message):
-        return
     await (bot.send_message
            (message.from_user.id, f"Hi, {message.from_user.full_name} ({message.from_user.id})"))
 
@@ -48,7 +47,7 @@ async def get_states_ha(message: Message, bot: Bot):
     if not await check_access(message):
         return
 
-    filter_value, value = await processing_filter(message)
+    filter_value, value = await Fp.processing_filter(message)
 
     req_ha = RequestApi()
     code, response = req_ha.method_get("states", None)
@@ -58,14 +57,14 @@ async def get_states_ha(message: Message, bot: Bot):
         return
 
     reply = response.json()
-    # filtered_elements = []
     if filter_value is None:
         filtered_elements = reply
     else:
         try:
             count = int(filter_value)
             if count <= 0:
-                await bot.send_message(message.from_user.id, "Количество элементов должно быть положительным числом.")
+                await bot.send_message(message.from_user.id,
+                                       "Количество элементов должно быть положительным числом.")
                 return
             filtered_elements = reply[:count]
         except ValueError:
@@ -91,27 +90,11 @@ async def get_states_ha(message: Message, bot: Bot):
         await asyncio.sleep(0.3)
 
 
-async def processing_filter(message, count_separators=2):
-    text = message.text.strip()
-    parts = text.split(maxsplit=4)
-
-    field = parts[2] if len(parts) > 2 and count_separators >= 2 else None
-    value = parts[3] if len(parts) > 3 and count_separators == 3 else None
-
-    return field, value
-
-
-async def get_entity_id_and_attribute(data):
-    entity_id = data.get('entity_id')
-    attributes = data.get('attributes')
-    return entity_id, attributes
-
-
 @router.message(lambda message: message.text.lower().startswith("update:bool states"))
 async def updated_states_ha(message: Message, bot: Bot):
     if not await check_access(message):
         return
-    field, value = await processing_filter(message, 3)
+    field, value = await Fp.processing_filter(message, 3)
     if value in ('1', 'on', 'вкл'):
         value = 'on'
     elif value in ('0', 'off', 'выкл'):
@@ -123,7 +106,7 @@ async def updated_states_ha(message: Message, bot: Bot):
     req_ha = RequestApi()
     code, response = req_ha.method_get(f"states/{field}", None)
     if int(code) == 200:
-        entity_id, attributes = await get_entity_id_and_attribute(response.json())
+        entity_id, attributes = await Fp.get_entity_id_and_attribute(response.json())
     else:
         await bot.send_message(message.from_user.id,
                                f"код ответа: {code}, проверьте работоспособность HA, и корректность запроса")
@@ -132,20 +115,21 @@ async def updated_states_ha(message: Message, bot: Bot):
         "state": value,
         "attributes": attributes
     }
-    code, response = req_ha.method_post(f"states/{field}", payload)
-    if int(code) == 200:
-        await bot.send_message(message.from_user.id, response.text)
-    else:
-        await bot.send_message(message.from_user.id,
-                               f"код ответа: {code}, проверьте работоспособность HA, и корректность запроса")
+    path = f"states/{field}"
+    code, response = await Com_Ha.send_command_on_ha(path, payload)
+    await answer_updated_states(bot, code, message, response)
+    if code != 200:
         return
 
 
 @router.message(lambda message: message.text.lower().startswith("turn ha"))
-async def turn_ha_object(message: Message, bot: Bot):
+async def turn_ha_object(message: Message, bot: Bot, cmd: str = None):
     if not await check_access(message):
         return
-    field, value = await processing_filter(message, 3)
+    if cmd is None:
+        field, value = await Fp.processing_filter(message, 3)
+    else:
+        field, value = await Fp.processing_short_filter(cmd, 3)
     if value in ('1', 'on', 'вкл'):
         value = 'on'
     elif value in ('0', 'off', 'выкл'):
@@ -154,15 +138,44 @@ async def turn_ha_object(message: Message, bot: Bot):
         await bot.send_message(message.from_user.id,
                                f"неизвестный аргумент: {value}, допустимо: [0, 1, вкл, выкл, on, off]")
         return
-    req_ha = RequestApi()
     payload = {
         "entity_id": field
     }
     parts = field.split('.')
-    code, response = req_ha.method_post(f"services/{parts[0]}/turn_{value}", payload)
+    path = f"services/{parts[0]}/turn_{value}"
+    code, response = await Com_Ha.send_command_on_ha(path, payload)
+
+    await answer_command_turn(bot, code, field, message, value)
+    if code != 200:
+        return
+
+
+@router.message()
+async def process_alias(message: Message, bot: Bot):
+    keys = [list(d.keys())[0] for d in aliases]
+
+    if message.text.strip() in keys:
+        cmd = next(d[message.text] for d in aliases if message.text in d)
+        await bot.send_message(message.from_user.id, f"Выполняется команда: {cmd}")
+        await turn_ha_object(message, bot, cmd)
+
+    else:
+        if not await check_access(message):
+            return
+        await bot.send_message(message.from_user.id, "Команда не известна")
+
+
+async def answer_command_turn(bot, code, field, message, value):
     if int(code) == 200:
         await bot.send_message(message.from_user.id, f"Объект {field} переведен в режим {value}")
     else:
         await bot.send_message(message.from_user.id,
                                f"код ответа: {code}, проверьте работоспособность HA, и корректность запроса")
-        return
+
+
+async def answer_updated_states(bot, code, message, response):
+    if int(code) == 200:
+        await bot.send_message(message.from_user.id, response.text)
+    else:
+        await bot.send_message(message.from_user.id,
+                               f"код ответа: {code}, проверьте работоспособность HA, и корректность запроса")

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 from dataclasses import dataclass
+
 from environs import Env
 
 
@@ -21,6 +22,12 @@ class HA:
 class Config:
     tg_bot: TgBot
     ha: HA
+    aliases: Alias
+
+
+@dataclass
+class Alias:
+    aliases: list
 
 
 def load_config(path: str | None = None) -> Config:
@@ -33,5 +40,8 @@ def load_config(path: str | None = None) -> Config:
         ha=HA(
             token=env('HA_TOKEN'),
             url=env('HA_URL')
+        ),
+        aliases=Alias(
+            aliases=ast.literal_eval(env('ALIASES'))
         )
     )
