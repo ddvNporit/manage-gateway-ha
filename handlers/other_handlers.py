@@ -1,6 +1,7 @@
 import asyncio
 
-from aiogram import Router, Bot
+from aiogram import Bot
+from aiogram.dispatcher.router import Router
 from aiogram.filters import CommandStart, Text
 from aiogram.types import Message
 
@@ -22,15 +23,38 @@ async def check_access(message: Message) -> bool:
     return True
 
 
+registered_commands = set()
+
+registered_commands.update(["<code>HELP</code> - вывод всех доступных команд"])
+
+
+@router.message(Text(text="HELP"))
+async def help_handler(message: Message):
+    if not registered_commands:
+        await message.answer("Команды не найдены.")
+        return
+    help_text = "Доступные команды:\n" + "\n".join(f"• {cmd}" for cmd in sorted(registered_commands))
+    await message.answer(help_text)
+
+
+registered_commands.update(["<code>start</code> - старт работы с телеграм ботом"])
+
+
 @router.message(CommandStart())
 async def process_start_comand(message: Message):
     await message.answer("Hi")
+
+
+registered_commands.update(["<code>Hi, Bot</code> - получить свои full_name и user_id"])
 
 
 @router.message(Text(text='Hi, Bot'))
 async def hi(message: Message, bot: Bot):
     await (bot.send_message
            (message.from_user.id, f"Hi, {message.from_user.full_name} ({message.from_user.id})"))
+
+
+registered_commands.update(["<code>config HA</code> - получить конфиг HA"])
 
 
 @router.message(Text(text='config HA'))
@@ -40,6 +64,9 @@ async def get_config_ha(message: Message, bot: Bot):
     req_ha = RequestApi()
     code, response = req_ha.method_get("config", None)
     await bot.send_message(message.from_user.id, f"ответ: {response.text}")
+
+
+registered_commands.update(["<code>states HA</code> - получить спискок всех объектов"])
 
 
 @router.message(lambda message: message.text.lower().startswith("states ha"))
@@ -90,6 +117,9 @@ async def get_states_ha(message: Message, bot: Bot):
         await asyncio.sleep(0.3)
 
 
+registered_commands.update(["<code>update:bool states</code> - обновить статус объекта"])
+
+
 @router.message(lambda message: message.text.lower().startswith("update:bool states"))
 async def updated_states_ha(message: Message, bot: Bot):
     if not await check_access(message):
@@ -122,6 +152,9 @@ async def updated_states_ha(message: Message, bot: Bot):
         return
 
 
+registered_commands.update(["<code>turn ha entity_id X</code> - вкл/выкл объекта entity_id, где X равно 1 или 0"])
+
+
 @router.message(lambda message: message.text.lower().startswith("turn ha"))
 async def turn_ha_object(message: Message, bot: Bot, cmd: str = None):
     if not await check_access(message):
@@ -148,6 +181,29 @@ async def turn_ha_object(message: Message, bot: Bot, cmd: str = None):
     await answer_command_turn(bot, code, field, message, value)
     if code != 200:
         return
+
+
+registered_commands.update(["<code>ALIAS</code> - вывод всех ВАШИХ КОМАНД, зарегистрированных в конфиге"])
+
+
+@router.message(lambda message: message.text.lower().startswith("alias"))
+async def alias_list_handler(message: Message):
+    keys = [list(d.keys())[0] for d in aliases]
+    response_lines = []
+    for d in aliases:
+        key = list(d.keys())[0]
+        cmd = d[key]
+        response_lines.append(f"<code>{key}</code> → {cmd}")
+    response = "Список псевдонимов:\n" + "\n".join(response_lines)
+    await message.answer(response)
+
+
+registered_commands.update(
+    [
+        """
+        <code>ВАША КОМАНДА</code> - вкл/выкл объекта c помощью псевдонимов. ВАША КОМАНДА регистрируется в конфиге
+        """
+    ])
 
 
 @router.message()
