@@ -188,7 +188,7 @@ registered_commands.update(["<code>ALIAS</code> - вывод всех ВАШИХ
 
 @router.message(lambda message: message.text.lower().startswith("alias"))
 async def alias_list_handler(message: Message):
-    keys = [list(d.keys())[0] for d in aliases]
+    # keys = [list(d.keys())[0] for d in aliases]
     response_lines = []
     for d in aliases:
         key = list(d.keys())[0]
