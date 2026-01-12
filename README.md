@@ -57,6 +57,10 @@ ALIASES=[<псевдоним команды 1>, <псевдоним команд
 
 - `config HA`  
 
+  Перезагрузить Home Assistant.
+
+- `restart HA`  
+
   Получить конфигурацию Home Assistant.
 
 - `states HA [фильтр]`  

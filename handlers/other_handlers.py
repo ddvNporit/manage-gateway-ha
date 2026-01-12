@@ -28,13 +28,24 @@ registered_commands = set()
 registered_commands.update(["<code>HELP</code> - вывод всех доступных команд"])
 
 
-@router.message(Text(text="HELP"))
+@router.message(lambda message: message.text.lower().startswith("help"))
 async def help_handler(message: Message):
     if not registered_commands:
         await message.answer("Команды не найдены.")
         return
     help_text = "Доступные команды:\n" + "\n".join(f"• {cmd}" for cmd in sorted(registered_commands))
     await message.answer(help_text)
+
+registered_commands.update(["<code>restart HA</code> - перезапуск Home Assistant"])
+
+
+@router.message(lambda message: message.text.lower().startswith("restart ha"))
+async def restart_ha_handler(message: Message, bot: Bot):
+    if not await check_access(message):
+        return
+    req_ha = RequestApi()
+    code, response = req_ha.method_post("services/homeassistant/restart", None)
+    await bot.send_message(message.from_user.id, f"ответ: {response.text}")
 
 
 registered_commands.update(["<code>start</code> - старт работы с телеграм ботом"])
@@ -200,9 +211,7 @@ async def alias_list_handler(message: Message):
 
 registered_commands.update(
     [
-        """
-        <code>ВАША КОМАНДА</code> - вкл/выкл объекта c помощью псевдонимов. ВАША КОМАНДА регистрируется в конфиге
-        """
+        "<code>ВАША КОМАНДА</code> - вкл/выкл объекта c помощью псевдонимов. ВАША КОМАНДА регистрируется в конфиге"
     ])
 
 
