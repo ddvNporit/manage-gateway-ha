@@ -1,9 +1,10 @@
 import asyncio
-
+import os
+import tempfile
 from aiogram import Bot
 from aiogram.dispatcher.router import Router
 from aiogram.filters import CommandStart, Text
-from aiogram.types import Message
+from aiogram.types import Message, FSInputFile
 
 from config_data.config import Config, load_config
 from handlers.commands import CommandsOnHa as Com_Ha
@@ -35,6 +36,7 @@ async def help_handler(message: Message):
         return
     help_text = "Доступные команды:\n" + "\n".join(f"• {cmd}" for cmd in sorted(registered_commands))
     await message.answer(help_text)
+
 
 registered_commands.update(["<code>restart HA</code> - перезапуск Home Assistant"])
 
@@ -207,6 +209,34 @@ async def alias_list_handler(message: Message):
         response_lines.append(f"<code>{key}</code> → {cmd}")
     response = "Список псевдонимов:\n" + "\n".join(response_lines)
     await message.answer(response)
+
+
+registered_commands.update(
+    [
+        "<code>camera entity_id</code> - получить фото с камеры с id равным entity_id"
+    ])
+
+
+@router.message(Text(text='camera security_camera'))
+async def get_security_camera_image(message: Message, bot: Bot):
+    if not await check_access(message):
+        return
+
+    req_ha = RequestApi()
+    code, response = req_ha.method_get("camera_proxy/camera.security_camera", None)
+
+    if code == 200:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp_file:
+            tmp_file.write(response.content)
+            tmp_file_path = tmp_file.name
+
+        try:
+            input_file = FSInputFile(tmp_file_path, filename="camera.jpg")
+            await bot.send_photo(message.from_user.id, photo=input_file)
+        finally:
+            os.remove(tmp_file_path)
+    else:
+        await bot.send_message(message.from_user.id, f"Ошибка при получении изображения: {code}")
 
 
 registered_commands.update(
