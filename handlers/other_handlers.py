@@ -218,7 +218,8 @@ async def process_alias(message: Message, bot: Bot):
     else:
         if not await check_access(message):
             return
-        await bot.send_message(message.from_user.id, "Команда не известна")
+        await bot.send_message(message.from_user.id,
+                               "Команда не известна, используйте <code>HELP</code> для получения списка команд")
 
 
 async def answer_command_turn(bot, code, field, message, value):
