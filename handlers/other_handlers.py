@@ -202,7 +202,6 @@ registered_commands.update(["<code>ALIAS</code> - вывод всех ВАШИХ
 
 @router.message(lambda message: message.text.lower().startswith("alias"))
 async def alias_list_handler(message: Message):
-    # keys = [list(d.keys())[0] for d in aliases]
     response_lines = []
     for d in aliases:
         key = list(d.keys())[0]
@@ -219,10 +218,13 @@ registered_commands.update(
 
 
 @router.message(lambda message: message.text.lower().startswith("camera ha"))
-async def get_security_camera_image(message: Message, bot: Bot):
+async def get_security_camera_image(message: Message, bot: Bot, cmd: str = None):
     if not await check_access(message):
         return
-    filter_value, value = await Fp.processing_filter(message)
+    if cmd is None:
+        filter_value, value = await Fp.processing_filter(message)
+    else:
+        filter_value, value = await Fp.processing_short_filter(cmd)
     if filter_value is not None:
         req_ha = RequestApi()
         code, response = req_ha.method_get(f"camera_proxy/camera.{filter_value}", None)
@@ -259,7 +261,13 @@ async def process_alias(message: Message, bot: Bot):
     if message.text.strip() in keys:
         cmd = next(d[message.text] for d in aliases if message.text in d)
         await bot.send_message(message.from_user.id, f"Выполняется команда: {cmd}")
-        await turn_ha_object(message, bot, cmd)
+
+        if cmd.lower().startswith("turn ha"):
+            await turn_ha_object(message, bot, cmd)
+        elif cmd.lower().startswith("camera ha"):
+            await get_security_camera_image(message, bot, cmd)
+        else:
+            await bot.send_message(message.from_user.id, "Команда не поддерживается")
 
     else:
         if not await check_access(message):
