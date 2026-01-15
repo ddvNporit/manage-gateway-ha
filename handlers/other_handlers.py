@@ -212,7 +212,7 @@ async def alias_list_handler(message: Message):
     await message.answer(response)
 
 
-help_str = ("<code>history entity_id X</code> - получить журнал событий за сутки"
+help_str = ("<code>history entity_id X</code> - получить массив изменений состояния за сутки"
             "с устройства с идентификатором entity_id, начиная с X (необяз. допустимо: 1-7)")
 registered_commands.update(
     [
@@ -244,7 +244,7 @@ async def get_history(message: Message, bot: Bot, cmd: str = None):
             if 7 >= delta_int > 0:
                 delta_data = DateTimeProcessor.get_date_minus_delta(delta_int)
                 await bot.send_message(message.from_user.id,
-                                       f"{atr}: чтение журнала событий до {delta_data}...")
+                                       f"{atr}: чтение массива изменений состояния до {delta_data}...")
                 code, response = req_ha.method_get(f"history/period/{delta_data}", param)
             else:
                 await bot.send_message(message.from_user.id,
@@ -256,7 +256,7 @@ async def get_history(message: Message, bot: Bot, cmd: str = None):
             return
     else:
         await bot.send_message(message.from_user.id,
-                               f"{atr}: чтение журнала событий за сутки...")
+                               f"{atr}: чтение массива изменений состояния за сутки...")
         code, response = req_ha.method_get(f"history/period", param)
     if int(code) != 200:
         await bot.send_message(message.from_user.id,
