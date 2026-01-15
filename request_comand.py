@@ -6,7 +6,6 @@ class RequestApi:
     @staticmethod
     def method_get(name_method_ha: str, params_request: dict = None):
         headers, url = RequestApi.constructor_header_url(name_method_ha)
-
         response = get(url, params=params_request, headers=headers)
         code = response.status_code
         return code, response

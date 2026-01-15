@@ -10,6 +10,7 @@ from aiogram.types import Message, FSInputFile
 from config_data.config import Config, load_config
 from handlers.commands import CommandsOnHa as Com_Ha
 from handlers.data_processor import FiltersData as Fp
+from handlers.data_processor import DateTimeProcessor
 from request_comand import RequestApi
 
 router: Router = Router()
@@ -88,7 +89,7 @@ async def get_states_ha(message: Message, bot: Bot):
     if not await check_access(message):
         return
 
-    filter_value, value = await Fp.processing_filter(message)
+    filter_value, value, atr = await Fp.processing_filter(message)
 
     req_ha = RequestApi()
     code, response = req_ha.method_get("states", None)
@@ -138,7 +139,7 @@ registered_commands.update(["<code>update:bool states</code> - обновить 
 async def updated_states_ha(message: Message, bot: Bot):
     if not await check_access(message):
         return
-    field, value = await Fp.processing_filter(message, 3)
+    field, value, atr = await Fp.processing_filter(message, 3)
     if value in ('1', 'on', 'вкл'):
         value = 'on'
     elif value in ('0', 'off', 'выкл'):
@@ -174,9 +175,9 @@ async def turn_ha_object(message: Message, bot: Bot, cmd: str = None):
     if not await check_access(message):
         return
     if cmd is None:
-        field, value = await Fp.processing_filter(message, 3)
+        field, value, atr = await Fp.processing_filter(message, 3)
     else:
-        field, value = await Fp.processing_short_filter(cmd, 3)
+        field, value, atr = await Fp.processing_short_filter(cmd, 3)
     if value in ('1', 'on', 'вкл'):
         value = 'on'
     elif value in ('0', 'off', 'выкл'):
@@ -211,6 +212,60 @@ async def alias_list_handler(message: Message):
     await message.answer(response)
 
 
+help_str = ("<code>history entity_id X</code> - получить журнал событий за сутки"
+            "с устройства с идентификатором entity_id, начиная с X (необяз. допустимо: 1-7)")
+registered_commands.update(
+    [
+        help_str
+    ])
+
+
+@router.message(lambda message: message.text.lower().startswith("history"))
+async def get_history(message: Message, bot: Bot, cmd: str = None):
+    if not await check_access(message):
+        return
+    if cmd is None:
+        filter_value, value, atr = await Fp.processing_filter(message, 3)
+    else:
+        filter_value, value, atr = await Fp.processing_short_filter(cmd, 3)
+    if atr is not None:
+
+        param = {
+            'filter_entity_id': atr
+        }
+    else:
+        await bot.send_message(message.from_user.id,
+                               f"Запрос отклонен. Пустой entity_id")
+        return
+    req_ha = RequestApi()
+    if filter_value is not None:
+        try:
+            delta_int = int(filter_value)
+            if 7 >= delta_int > 0:
+                delta_data = DateTimeProcessor.get_date_minus_delta(delta_int)
+                await bot.send_message(message.from_user.id,
+                                       f"{atr}: чтение журнала событий до {delta_data}...")
+                code, response = req_ha.method_get(f"history/period/{delta_data}", param)
+            else:
+                await bot.send_message(message.from_user.id,
+                                       f"Проверьте корректность запроса, некорректное значение delta (X)")
+                return
+        except (TypeError, ValueError):
+            await bot.send_message(message.from_user.id,
+                                   f"Проверьте корректность запроса, некорректное значение delta (X)")
+            return
+    else:
+        await bot.send_message(message.from_user.id,
+                               f"{atr}: чтение журнала событий за сутки...")
+        code, response = req_ha.method_get(f"history/period", param)
+    if int(code) != 200:
+        await bot.send_message(message.from_user.id,
+                               f"код ответа: {code}, проверьте работоспособность HA, и корректность запроса")
+        return
+    else:
+        await bot.send_message(message.from_user.id, f"ответ: {response.text}")
+
+
 registered_commands.update(
     [
         "<code>camera HA entity_id</code> - получить фото с камеры с идентификатором entity_id"
@@ -222,9 +277,9 @@ async def get_security_camera_image(message: Message, bot: Bot, cmd: str = None)
     if not await check_access(message):
         return
     if cmd is None:
-        filter_value, value = await Fp.processing_filter(message)
+        filter_value, value, atr = await Fp.processing_filter(message)
     else:
-        filter_value, value = await Fp.processing_short_filter(cmd)
+        filter_value, value, atr = await Fp.processing_short_filter(cmd)
     if filter_value is not None:
         req_ha = RequestApi()
         code, response = req_ha.method_get(f"camera_proxy/camera.{filter_value}", None)
