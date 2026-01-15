@@ -1,12 +1,11 @@
 import asyncio
-import os
-import tempfile
 
 from aiogram import Bot
 from aiogram.dispatcher.router import Router
 from aiogram.filters import CommandStart, Text
-from aiogram.types import Message, FSInputFile
+from aiogram.types import Message
 
+from answers.telegram_answer import TgAnswers
 from config_data.config import Config, load_config
 from handlers.commands import CommandsOnHa as Com_Ha
 from handlers.data_processor import DateTimeProcessor
@@ -89,7 +88,7 @@ async def get_states_ha(message: Message, bot: Bot):
     if not await check_access(message):
         return
 
-    filter_value, value, atr = await _get_filter(message)
+    filter_value, value, atr = await Fp.get_filter(message)
 
     req_ha = RequestApi()
     code, response = req_ha.method_get("states", None)
@@ -137,9 +136,10 @@ registered_commands.update(["<code>update:bool states</code> - обновить 
 
 @router.message(lambda message: message.text.lower().startswith("update:bool states"))
 async def updated_states_ha(message: Message, bot: Bot):
+    tg = TgAnswers()
     if not await check_access(message):
         return
-    field, value, atr = await _get_filter(message)#= await Fp.processing_filter(message, 3)
+    field, value, atr = await Fp.get_filter(message)  # = await Fp.processing_filter(message, 3)
     if value in ('1', 'on', 'вкл'):
         value = 'on'
     elif value in ('0', 'off', 'выкл'):
@@ -162,7 +162,7 @@ async def updated_states_ha(message: Message, bot: Bot):
     }
     path = f"states/{field}"
     code, response = await Com_Ha.send_command_on_ha(path, payload)
-    await answer_updated_states(bot, code, message, response)
+    await tg.answer_base(bot, code, message, response)
     if code != 200:
         return
 
@@ -172,9 +172,10 @@ registered_commands.update(["<code>turn ha entity_id X</code> - вкл/выкл 
 
 @router.message(lambda message: message.text.lower().startswith("turn ha"))
 async def turn_ha_object(message: Message, bot: Bot, cmd: str = None):
+    tg = TgAnswers()
     if not await check_access(message):
         return
-    field, value, atr = await _get_filter(message, cmd, 3)
+    field, value, atr = await Fp.get_filter(message, cmd, 3)
     if value in ('1', 'on', 'вкл'):
         value = 'on'
     elif value in ('0', 'off', 'выкл'):
@@ -190,7 +191,7 @@ async def turn_ha_object(message: Message, bot: Bot, cmd: str = None):
     path = f"services/{parts[0]}/turn_{value}"
     code, response = await Com_Ha.send_command_on_ha(path, payload)
 
-    await answer_command_turn(bot, code, field, message, value)
+    await tg.answer_command_turn(bot, code, field, message, value)
     if code != 200:
         return
 
@@ -219,10 +220,11 @@ registered_commands.update(
 
 @router.message(lambda message: message.text.lower().startswith("history"))
 async def get_history(message: Message, bot: Bot, cmd: str = None) -> None:
+    tg = TgAnswers()
     if not await check_access(message):
         return
 
-    filter_value, value, atr = await _get_filter(message, cmd, 3)
+    filter_value, value, atr = await Fp.get_filter(message, cmd, 3)
     if not atr:
         await bot.send_message(message.from_user.id, "Запрос отклонен. Пустой entity_id")
         return
@@ -232,7 +234,7 @@ async def get_history(message: Message, bot: Bot, cmd: str = None) -> None:
 
     delta_date = None
     if filter_value:
-        if not _validate_delta(filter_value):
+        if not Fp.validate_delta(filter_value):
             await bot.send_message(message.from_user.id,
                                    "Проверьте корректность запроса, некорректное значение delta (filter)")
             return
@@ -247,12 +249,9 @@ async def get_history(message: Message, bot: Bot, cmd: str = None) -> None:
     endpoint = f"history/period/{delta_date}" if delta_date else "history/period"
     code, response = req_ha.method_get(endpoint, param)
 
-    if int(code) != 200:
-        await bot.send_message(message.from_user.id,
-                               f"код ответа: {code}, проверьте работоспособность HA, и корректность запроса")
+    await tg.answer_base(bot, code, message, response)
+    if code != 200:
         return
-
-    await bot.send_message(message.from_user.id, f"ответ: {response.text}")
 
 
 registered_commands.update(
@@ -263,26 +262,16 @@ registered_commands.update(
 
 @router.message(lambda message: message.text.lower().startswith("camera ha"))
 async def get_security_camera_image(message: Message, bot: Bot, cmd: str = None):
+    tg = TgAnswers()
     if not await check_access(message):
         return
-    filter_value, value, atr = await _get_filter(message, cmd, 3)
+    filter_value, value, atr = await Fp.get_filter(message, cmd, 3)
     if filter_value is not None:
         req_ha = RequestApi()
         code, response = req_ha.method_get(f"camera_proxy/camera.{filter_value}", None)
 
-        if code == 200:
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp_file:
-                tmp_file.write(response.content)
-                tmp_file_path = tmp_file.name
-
-            try:
-                input_file = FSInputFile(tmp_file_path, filename="camera.jpg")
-                await bot.send_photo(message.from_user.id, photo=input_file)
-            finally:
-                os.remove(tmp_file_path)
-        else:
-            await bot.send_message(message.from_user.id,
-                                   f"код ответа: {code}, проверьте работоспособность HA, и корректность запроса")
+        await tg.answer_send_image(bot, code, message, response)
+        if code != 200:
             return
     else:
         await bot.send_message(message.from_user.id,
@@ -315,34 +304,3 @@ async def process_alias(message: Message, bot: Bot):
             return
         await bot.send_message(message.from_user.id,
                                "Команда не известна, используйте <code>HELP</code> для получения списка команд")
-
-
-async def answer_command_turn(bot, code, field, message, value):
-    if int(code) == 200:
-        await bot.send_message(message.from_user.id, f"Объект {field} переведен в режим {value}")
-    else:
-        await bot.send_message(message.from_user.id,
-                               f"код ответа: {code}, проверьте работоспособность HA, и корректность запроса")
-
-
-async def answer_updated_states(bot, code, message, response):
-    if int(code) == 200:
-        await bot.send_message(message.from_user.id, response.text)
-    else:
-        await bot.send_message(message.from_user.id,
-                               f"код ответа: {code}, проверьте работоспособность HA, и корректность запроса")
-
-
-async def _get_filter(message: Message, cmd: str = None, count_separators=2):
-    if cmd is None:
-        return await Fp.processing_filter(message, count_separators)
-    else:
-        return await Fp.processing_short_filter(cmd, count_separators)
-
-
-def _validate_delta(value: str) -> bool:
-    try:
-        val = int(value)
-        return 0 < val <= 7
-    except (TypeError, ValueError):
-        return False
