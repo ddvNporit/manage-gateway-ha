@@ -1,6 +1,7 @@
 import os
 import tempfile
-
+import asyncio
+from typing import List
 from aiogram.types import FSInputFile
 
 
@@ -14,12 +15,34 @@ class TgAnswers:
                                    f"код ответа: {code}, проверьте работоспособность HA, и корректность запроса")
 
     @staticmethod
-    async def answer_base(bot, code, message, response):
+    async def answer_base(bot, code: int, message, response):
         if int(code) == 200:
-            await bot.send_message(message.from_user.id, response.text)
+            text = response.text
+            max_length = 4096
+
+            if len(text) <= max_length:
+                await bot.send_message(message.from_user.id, text)
+            else:
+                words = text.split(' ')
+                parts = []
+                current_part = []
+
+                for word in words:
+                    if len(' '.join(current_part + [word])) <= max_length:
+                        current_part.append(word)
+                    else:
+                        parts.append(' '.join(current_part))
+                        current_part = [word]
+
+                if current_part:
+                    parts.append(' '.join(current_part))
+
+                for part in parts:
+                    await bot.send_message(message.from_user.id, part)
+                    await asyncio.sleep(0.3)
         else:
             await bot.send_message(message.from_user.id,
-                                   f"код ответа: {code}, проверьте работоспособность HA, и корректность запроса")
+                                   f"Код ответа: {code}, проверьте работоспособность HA и корректность запроса")
 
     @staticmethod
     async def answer_send_image(bot, code, message, response):

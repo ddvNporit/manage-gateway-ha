@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-
+from urllib.parse import quote
 import tzlocal
 from aiogram.types import Message
 
@@ -55,3 +55,14 @@ class DateTimeProcessor:
         now = datetime.now(local_tz)
         target_date = now - timedelta(days=delta)
         return target_date.strftime("%Y-%m-%dT%H:%M:%S%z")[:-2] + ":" + target_date.strftime("%Y-%m-%dT%H:%M:%S%z")[-2:]
+
+    @staticmethod
+    def get_encoded_future_time(delta: int) -> str:
+        if not (0 <= delta <= 7):
+            raise ValueError("delta должен быть в диапазоне от 0 до 7")
+        local_tz = tzlocal.get_localzone()
+        now = datetime.now(local_tz)
+        target_date = now + timedelta(days=delta)
+        formatted = target_date.strftime("%Y-%m-%dT%H:%M:%S%z")
+        formatted = formatted[:-2] + ":" + formatted[-2:]
+        return quote(formatted)

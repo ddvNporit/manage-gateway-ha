@@ -254,6 +254,51 @@ async def get_history(message: Message, bot: Bot, cmd: str = None) -> None:
         return
 
 
+help_str = ("<code>history entity_id X</code> - получить массив изменений состояния за сутки"
+            "с устройства с идентификатором entity_id, начиная с X (необяз. допустимо: 1-7)")
+registered_commands.update(
+    [
+        help_str
+    ])
+
+
+@router.message(lambda message: message.text.lower().startswith("log"))
+async def get_log(message: Message, bot: Bot, cmd: str = None) -> None:
+    tg = TgAnswers()
+    if not await check_access(message):
+        return
+
+    filter_value, value, atr = await Fp.get_filter(message, cmd, 3)
+    if atr in [None, "*", "all", "-"]:
+        atr = None
+    param = {}
+    if atr is not None:
+        param['entity'] = atr
+    if value is not None:
+        if not Fp.validate_delta(filter_value):
+            await bot.send_message(message.from_user.id,
+                                   "Проверьте корректность запроса, некорректное значение delta (filter)")
+            return
+        # encoded_delta_date = DateTimeProcessor.get_encoded_future_time(int(value))
+        delta_date_end = DateTimeProcessor.get_date_minus_delta(int(value))
+        param['end_time'] = delta_date_end
+    req_ha = RequestApi()
+    if filter_value is not None:
+        if not Fp.validate_delta(filter_value):
+            await bot.send_message(message.from_user.id,
+                                   "Проверьте корректность запроса, некорректное значение delta (filter)")
+            return
+        delta_date = DateTimeProcessor.get_date_minus_delta(int(filter_value))
+        endpoint = f"logbook/{delta_date}"
+    else:
+        endpoint = "logbook"
+    code, response = req_ha.method_get(endpoint, param)
+
+    await tg.answer_base(bot, code, message, response)
+    if code != 200:
+        return
+
+
 registered_commands.update(
     [
         "<code>camera HA entity_id</code> - получить фото с камеры с идентификатором entity_id"
