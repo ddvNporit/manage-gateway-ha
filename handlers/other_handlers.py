@@ -1,4 +1,3 @@
-import asyncio
 
 from aiogram import Bot
 from aiogram.dispatcher.router import Router
@@ -55,7 +54,7 @@ registered_commands.update(["<code>start</code> - старт работы с т�
 
 
 @router.message(CommandStart())
-async def process_start_comand(message: Message):
+async def process_start_command(message: Message):
     await message.answer("Hi")
 
 
@@ -73,18 +72,19 @@ registered_commands.update(["<code>config HA</code> - получить конф�
 
 @router.message(Text(text='config HA'))
 async def get_config_ha(message: Message, bot: Bot):
+    tg = TgAnswers()
     if not await check_access(message):
         return
     req_ha = RequestApi()
     code, response = req_ha.method_get("config", None)
-    await bot.send_message(message.from_user.id, f"ответ: {response.text}")
-
+    await tg.answer_base(bot, code, message, response, True)
 
 registered_commands.update(["<code>states HA</code> - получить спискок всех объектов"])
 
 
 @router.message(lambda message: message.text.lower().startswith("states ha"))
 async def get_states_ha(message: Message, bot: Bot):
+    tg = TgAnswers()
     if not await check_access(message):
         return
 
@@ -113,22 +113,7 @@ async def get_states_ha(message: Message, bot: Bot):
     if not filtered_elements:
         await bot.send_message(message.from_user.id, "По заданному критерию ничего не найдено.")
         return
-
-    messages = []
-    current_msg = ""
-    for i, el in enumerate(filtered_elements):
-        line = f"element #{i}: {el}\n"
-        if len(current_msg) + len(line) > 4096:
-            messages.append(current_msg)
-            current_msg = line
-        else:
-            current_msg += line
-    if current_msg:
-        messages.append(current_msg)
-
-    for msg in messages:
-        await bot.send_message(message.from_user.id, msg)
-        await asyncio.sleep(0.3)
+    await tg.answer_base(bot, code, message, filtered_elements, True)
 
 
 registered_commands.update(["<code>update:bool states</code> - обновить статус объекта"])
