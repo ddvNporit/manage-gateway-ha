@@ -124,7 +124,7 @@ async def updated_states_ha(message: Message, bot: Bot):
     tg = TgAnswers()
     if not await check_access(message):
         return
-    field, value, atr = await Fp.get_filter(message)  # = await Fp.processing_filter(message, 3)
+    field, value, atr = await Fp.get_filter(message)
     if value in ('1', 'on', 'вкл'):
         value = 'on'
     elif value in ('0', 'off', 'выкл'):
@@ -234,7 +234,7 @@ async def get_history(message: Message, bot: Bot, cmd: str = None) -> None:
     endpoint = f"history/period/{delta_date}" if delta_date else "history/period"
     code, response = req_ha.method_get(endpoint, param)
 
-    await tg.answer_base(bot, code, message, response)
+    await tg.answer_base(bot, code, message, response, True)
     if code != 200:
         return
 
@@ -279,7 +279,7 @@ async def get_log(message: Message, bot: Bot, cmd: str = None) -> None:
         endpoint = "logbook"
     code, response = req_ha.method_get(endpoint, param)
 
-    await tg.answer_base(bot, code, message, response)
+    await tg.answer_base(bot, code, message, response, True)
     if code != 200:
         return
 
