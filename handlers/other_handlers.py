@@ -239,8 +239,8 @@ async def get_history(message: Message, bot: Bot, cmd: str = None) -> None:
         return
 
 
-help_str = ("<code>history entity_id X</code> - получить массив изменений состояния за сутки"
-            "с устройства с идентификатором entity_id, начиная с X (необяз. допустимо: 1-7)")
+help_str = ("<code>log entity_id X Y</code> - получить массив изменений состояния за сутки"
+            "с устройства с идентификатором entity_id, начиная с X по Y (необяз. допустимо: 1-7)")
 registered_commands.update(
     [
         help_str
