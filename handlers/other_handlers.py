@@ -186,6 +186,8 @@ registered_commands.update(["<code>ALIAS</code> - вывод всех ВАШИХ
 
 @router.message(lambda message: message.text.lower().startswith("alias"))
 async def alias_list_handler(message: Message):
+    if not await check_access(message):
+        return
     response_lines = []
     for d in aliases:
         key = list(d.keys())[0]
@@ -319,6 +321,8 @@ async def process_alias(message: Message, bot: Bot):
     keys = [list(d.keys())[0] for d in aliases]
 
     if message.text.strip() in keys:
+        if not await check_access(message):
+            return
         cmd = next(d[message.text] for d in aliases if message.text in d)
         await bot.send_message(message.from_user.id, f"Выполняется команда: {cmd}")
 
